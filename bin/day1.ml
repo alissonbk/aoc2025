@@ -28,24 +28,13 @@ let puzzle1 =
     match lst with
       | [] -> sum
       | h :: t -> 
-        let next_v = (match h with
-          | R n ->             
-            if (curr + n) > 99 then
-              (curr + n) - 100
-            else
-              curr + n
-          | L n ->            
-            if (curr - n) < 0 then
-              100 + (curr - n)
-            else
-              curr - n
-        ) in
-        let next_sum = if next_v = 0 then sum + 1 else sum in
-        printf "next_v: %d\n" next_v;
-        loop t next_v next_sum
+        let (next_v, pass_through_zero) = (match h with
+          | R n -> ((curr + n) mod 100, (n / 100) + if (curr + (n mod 100)) > 99 then 1 else 0)
+          | L n -> ((curr - n + 100 * 100) mod 100, (n / 100)  + if (curr - (n mod 100)) < 0 then 1 else 0)
+        ) in                        
+        loop t next_v (sum + pass_through_zero)
   in
-  loop input 50 0  
-  (* input |> List.iter (fun s -> match s with | R n -> printf "R %d" n | L n -> printf "L %d" n) *)
+  loop input 50 0    
 
 
 let () = printf "puzzle1 result: %d\n" puzzle1
