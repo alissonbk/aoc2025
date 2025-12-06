@@ -6,20 +6,13 @@ let half_string str =
   (String.sub str 0 (len / 2), String.sub str (len / 2) (len / 2))
 
 let is_invalid_id str () =
-  (* printf "str: %s\n" str;   *)  
-  let rec loop group_size =
-    (* printf "loop group_size %d\n" group_size; *)
+  if (int_of_string str) < 10 then false else
+  let rec loop group_size =    
     let group_amount = (String.length str) / group_size in
     let first_part = String.sub str 0 group_size in
     let rec l last_part curr_pos idx = 
       if idx = (group_amount - 1) then         
-        if last_part = first_part && group_size * group_amount = String.length str then 
-          (             
-            (* printf "group_size %d\n" group_size;
-            printf "group_amount %d\n" group_amount;
-            printf "last_part: %s\n" last_part; *)
-          true)
-        else false 
+        last_part = first_part && group_size * group_amount = String.length str
       else
       let next_pos = (curr_pos + group_size) in
       let part = String.sub str curr_pos group_size in
@@ -54,8 +47,7 @@ let sum_invalid_ids_2 range =
   let rec loop pos sum =    
     if pos > endd then sum else (      
       let pos_str = string_of_int pos in      
-      if is_invalid_id pos_str () then (
-        printf "invalid: %s\n" pos_str;
+      if is_invalid_id pos_str () then (        
         loop (pos + 1) (sum + pos) 
       )
       else loop (pos + 1) sum
