@@ -40,32 +40,32 @@ let puzzle1 =
   !sum
 
 
-let puzzle2 = 
-  let input = read_file in  
-  (* List.iter (fun (hdev, dsts) -> printf "hdev: %s: " hdev; dsts |> List.fold_left (fun acc curr -> acc ^ "-" ^ curr) "" |> printf "%s"; printf "\n") input; *)
-  let sum = ref 0 in
-  let rec loop lst curr_dev visited_dac visited_fft visited =
-    if List.mem curr_dev visited then
-      ()
-    else      
-    (match lst with
-      | [] -> ()
-      | (hdev, hdsts) :: t ->                      
-        if curr_dev = "out" then (  
-          if visited_dac && visited_fft then sum := !sum + 1
+
+
+
+module StringSet = Set.Make(String)
+let puzzle2 =
+    let input = read_file in  
+  (* List.iter (fun (hdev, dsts) -> printf "hdev: %s: " hdev; dsts |> List.fold_left (fun acc curr -> acc ^ "-" ^ curr) "" |> printf "%s"; printf "\n") input; *)  
+  let rec loop lst curr_dev visted_dac visited_fft cache =
+    match lst with
+      | [] -> 0
+      | (hdev, hdsts) :: t ->              
+        if curr_dev = "out" && visted_dac && visited_fft then (          
+          1
         ) else
-        if hdev = curr_dev then (                    
-          List.iter (fun curr -> 
-            let visited_dac = visited_dac || curr = "dac" in
-            let visited_fft = visited_fft || curr = "fft" in
-            (loop input curr visited_dac visited_fft (curr_dev :: visited))
-          ) hdsts
+        if hdev = curr_dev then (                              
+          let new_dac = visted_dac || curr_dev = "dac" in
+          let new_fft = visted_dac || curr_dev = "fft" in                    
+          List.fold_left (fun acc curr -> acc + (loop input curr new_dac new_fft (StringSet.add curr_dev cache))) 0 hdsts
         ) else (
-          loop t curr_dev visited_dac visited_fft visited
-        ))
+          loop t curr_dev visted_dac visited_fft cache
+        )
   in
-  loop input "svr" false false [];
-  !sum
+  loop input "svr" false false StringSet.empty
+
+  
+  
 
 
 let () =
