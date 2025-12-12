@@ -1,7 +1,9 @@
 open Printf
 
 
-let max_iterations = 10
+let max_iterations = 1000
+
+type dst = { dst : float; pair: ((int * int * int) * (int * int * int)) }
 
 let read_file =
   let chann = open_in "bin/input8.txt" in
@@ -49,28 +51,25 @@ let ignore_jbox = (-1, -1, -1),(-1,-1,-1)
 
 let is_ignore_jbox (jboxa, jboxb) = let (iga, igb) = ignore_jbox in compare_jbox jboxa iga && compare_jbox jboxb igb
 
-let get_closest input last_closest =  
-  let closest = ref (max_int_jbox, min_int_jbox) in
-  for i = 0 to (Array.length input) - 1 do 
-    let ca = input.(i) in
+let print_circuits =
+  Array.iteri (fun idx circuit ->
+    printf "circuit %d: " idx;
+    circuit |> List.iter (fun (x, y, z) -> printf "%d, %d, %d   -    " x y z); printf "\n")
+
+
+let sort_input input =
+  let dynarr = Dynarray.create () in  
+  for i = 0 to (Array.length input) -1 do     
     for j = 0 to (Array.length input) - 1 do       
-      if j = i then () else(
-        let cb = input.(j) in
-        match !closest with
-          | (c1, c2) ->
-            (            
-              let lca, lcb = last_closest in
-              if (euclidean_dst ca cb) < (euclidean_dst c1 c2) && 
-                euclidean_dst ca cb >= euclidean_dst lca lcb && 
-                (not (compare_jbox lca ca && compare_jbox lcb cb)) && 
-                (not (compare_jbox lca cb && compare_jbox lcb ca))  then (
-                closest := (ca, cb)
-              )
-            )
+      if i < j then (
+        let dst = euclidean_dst input.(i) input.(j) in
+        Dynarray.add_last dynarr { dst = dst; pair = (input.(i), input.(j))}
       )
-    done    
+    done
   done;
-  !closest  
+  let arr = Dynarray.to_array dynarr in
+  arr |> Array.sort (fun ra rb -> Float.compare ra.dst rb.dst );
+  arr
 
 let find_next_empty_arr_pos arr =
   let exception Break of int in  
@@ -83,6 +82,18 @@ let find_next_empty_arr_pos arr =
     | Break i -> i
 
 
+
+(* i think the circuit will need to be sorted to work ... *)
+let merge_circuits (circuits : 'a list array) ida idb () =  
+  (* Array.sort (fun a b -> (List.length a) - (List.length b) ) circuits;         *)
+  if ida < idb then (
+    circuits.(ida) <- (List.append circuits.(ida) circuits.(idb));
+    circuits.(idb) <- []
+  ) else (
+    circuits.(idb) <- (List.append circuits.(idb) circuits.(ida));
+    circuits.(ida) <- []
+  )
+
 let calculate_circuits circuits =  
   let mult = ref 1 in  
   for i = 0 to 2 do 
@@ -93,54 +104,59 @@ let calculate_circuits circuits =
   
 
 
+let find_circuit_member_idx circuits jbox =
+  let id = ref (-1) in
+  circuits |> Array.iteri (fun idx circuit -> if lst_mem jbox circuit then id := idx);
+  !id
 
-let append_circuit circuits jboxa jboxb () =    
-  let exception Break of bool in  
-  try
-    Array.sort (fun a b -> (List.length b) - (List.length a) ) circuits;
-    circuits |> Array.iteri (fun idx circuit ->     
-        let is_a_mem = lst_mem jboxa circuit in
-        let is_b_mem = lst_mem jboxb circuit in        
-        if is_a_mem && is_b_mem then (raise (Break true));
-        if is_a_mem && not is_b_mem then (
-          Array.set circuits idx (jboxb :: circuits.(idx));
-          raise (Break false)
-        );
-        if is_b_mem && not is_a_mem then (
-          Array.set circuits idx (jboxa :: circuits.(idx));
-          raise (Break false)
-        )        
-      );
+let append_circuit circuits jboxa jboxb () =                
+    let ida = find_circuit_member_idx circuits jboxa in
+    let idb = find_circuit_member_idx circuits jboxb in 
+    (* print_circuits circuits; printf "\n\n";    
+    print_tupl jboxa;
+    print_tupl jboxb;
+    printf "circuit member: ida: %d idb : %d\n; circuits length: %d\n" ida idb (Array.length circuits);
+    print_circuits circuits; printf "\n\n";     *)
+    if ida = (-1) && idb = (-1) then (      
       let set_pos = find_next_empty_arr_pos circuits in
-      if set_pos = (-1) then
-        (
+      if set_pos = (-1) then(
         (Array.append circuits (Array.make 1 [jboxa; jboxb]), false))
       else (
-        Array.set circuits set_pos [jboxa; jboxb];
+        circuits.(set_pos) <- [jboxa; jboxb];
         (circuits, false)
-      )      
-  with 
-    | Break both_equal -> (circuits, both_equal)
+      ) 
+    ) else if ida = (-1) then (
+      circuits.(idb) <- (jboxa :: circuits.(idb));
+      circuits, false
+    ) else if idb = (-1) then (
+      circuits.(ida) <- (jboxb :: circuits.(ida));
+      circuits, false
+    ) else if ida <> idb then (       
+      printf "mergin circuits %d %d" ida idb;     
+      merge_circuits circuits ida idb (); 
+      circuits, false      
+    ) else if ida = idb then ( circuits, true ) else (failwith "invalid")
   
 let () = 
   let input = read_file |> Array.of_list in      
-  let return_result circuits = 
-       Array.sort (fun a b -> (List.length b) - (List.length a) ) circuits;
-        (* circuits |> Array.iteri (fun idx circuit ->
-        printf "circuit %d: " idx;
-        circuit |> List.iter (fun (x, y, z) -> printf "%d, %d, %d   -    " x y z); printf "\n"); *)
+  let return_result circuits () = 
+       Array.sort (fun a b -> (List.length b) - (List.length a) ) circuits;        
         calculate_circuits circuits in
-  let rec update_circuits circuits last_closest idx () =
-    if idx = (max_iterations - 1) then (return_result circuits) else
-    let (ca, cb) = get_closest input last_closest in
-    (* printf "closest: "; print_tupl ca; print_tupl cb; *)    
-    let (new_circuit, both_equal) = append_circuit circuits ca cb () in
+  let sorted = sort_input input in
+  let rec update_circuits circuits idx arridx () =
+    if idx = (max_iterations - 1) then (
+      Array.sort (fun a b -> (List.length b) - (List.length a) ) circuits;    
+      print_circuits circuits;
+      return_result circuits ()
+    ) else
+    let (ca, cb) = sorted.(arridx).pair in
+    (* printf "closest: "; print_tupl ca; print_tupl cb;     *)
+    let (new_circuit, both_equal) = append_circuit circuits ca cb () in    
     if both_equal then (       
-      update_circuits new_circuit (ca, cb) (idx) ()
+      update_circuits new_circuit (idx) (arridx + 1) ()
     ) else (
-        update_circuits new_circuit (ca, cb) (idx + 1) ()
-    )
-    
-  in
-  let res = update_circuits (Array.make max_iterations []) ignore_jbox 0 () in
+        update_circuits new_circuit (idx + 1) (arridx + 1) ()
+    )    
+  in  
+  let res = update_circuits (Array.make max_iterations []) 0 0 () in
   printf "res: %d\n" res
