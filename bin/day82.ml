@@ -10,7 +10,7 @@ let euclidean_dst (xa, ya, za) (xb, yb, zb) =
   let dz = float_of_int (zb - za) in
   sqrt (dx *. dx +. dy *. dy +. dz *. dz)
 
-type dst = { dst : float; pos_pair: int * int }
+type dst = { dst : float; pos_pair: int * int; jbox_pair: (int * int * int) * (int * int * int) }
 
 (* let print_dst = function | r -> 
   let ((xa, ya, za), (xb, yb, zb)) = r.pair in 
@@ -35,7 +35,7 @@ let sort_input input =
     for j = 0 to (Array.length input) - 1 do       
       if i > j then (
         let dst = euclidean_dst input.(i) input.(j) in
-        Dynarray.add_last dynarr { dst = dst; pos_pair = (i, j)}
+        Dynarray.add_last dynarr { dst = dst; pos_pair = (i, j); jbox_pair = (input.(i), input.(j)) }
       )
     done
   done;
@@ -46,10 +46,11 @@ let sort_input input =
 
 
 
-let puzzle1 =
+let puzzle1 () =  
   let input = read_file |> Array.of_list |> sort_input  in  
   let find_array = Array.init (Array.length input) (fun i -> i) in    
-  printf "find array 3 : %d\n" find_array.(3);
+  let conns = ref 0 in
+  printf "input size: %d" @@ Array.length input;
   let rec find a = (
     if find_array.(a) == a then (
         a
@@ -58,11 +59,19 @@ let puzzle1 =
       find_array.(a)
     )    
   ) in  
-  let find_all a b = (find_array.(find(a)) <- find(b)) in
-  for i = 0 to max_iterations - 1 do     
+  let join a b = (find_array.(find(a)) <- find(b)) in
+  (* for i = 0 to max_iterations - 1 do      *)
+  for i = 0 to (Array.length input) - 1 do         
     let record = input.(i) in
     let a, b = record.pos_pair in
-    find_all a b
+    let (xa, _, _), (xb, _, _) = record.jbox_pair in
+    if find(a) != find(b) then (
+      conns := !conns + 1;      
+      if !conns == max_iterations - 1 then (                
+        printf "puzzle 2: %d\n" (xa * xb); flush_all ()
+      );
+      join a b
+    )    
   done;  
   let size_lst = Array.make (Array.length input) 0 in
   for i = 0 to (Array.length input) - 1 do
@@ -74,4 +83,4 @@ let puzzle1 =
   size_lst.(0) * size_lst.(1) * size_lst.(2)
 
 let () = 
-  printf "result1: %d\n" puzzle1
+  printf "result1: %d\n" @@ puzzle1 ()
