@@ -44,26 +44,41 @@ let puzzle1 =
 
 
 module StringSet = Set.Make(String)
-let puzzle2 =
-    let input = read_file in  
-  (* List.iter (fun (hdev, dsts) -> printf "hdev: %s: " hdev; dsts |> List.fold_left (fun acc curr -> acc ^ "-" ^ curr) "" |> printf "%s"; printf "\n") input; *)  
-  let rec loop lst curr_dev visted_dac visited_fft cache =
-    match lst with
-      | [] -> 0
-      | (hdev, hdsts) :: t ->              
-        if curr_dev = "out" && visted_dac && visited_fft then (          
-          1
-        ) else
-        if hdev = curr_dev then (                              
-          let new_dac = visted_dac || curr_dev = "dac" in
-          let new_fft = visted_dac || curr_dev = "fft" in                    
-          List.fold_left (fun acc curr -> acc + (loop input curr new_dac new_fft (StringSet.add curr_dev cache))) 0 hdsts
-        ) else (
-          loop t curr_dev visted_dac visited_fft cache
-        )
-  in
-  loop input "svr" false false StringSet.empty
 
+
+let create_ht input =
+  List.fold_left (fun acc (dev, dsts) ->
+    List.fold_left (fun acc' dst ->
+      let current = Hashtbl.find_opt acc' dev |> Option.value ~default:[] in
+      Hashtbl.replace acc' dev (dst :: current);
+      acc'
+    ) acc dsts
+  ) (Hashtbl.create 100) input
+
+
+let puzzle2 =
+  let input = read_file |> create_ht in
+  
+  let memo = Hashtbl.create 100 in
+  
+  let rec count_paths node visited_dac visited_fft =
+    if node = "out" then
+      if visited_dac && visited_fft then 1 else 0
+    else
+      let key = (node, visited_dac, visited_fft) in
+      match Hashtbl.find_opt memo key with
+      | Some(x) -> x
+      | None ->
+          let neighbors = Hashtbl.find_opt input node |> Option.value ~default:[] in
+          let result = List.fold_left (fun acc neighbor ->
+            let new_visited_dac = visited_dac || (neighbor = "dac") in
+            let new_visited_fft = visited_fft || (neighbor = "fft") in
+            acc + count_paths neighbor new_visited_dac new_visited_fft
+          ) 0 neighbors in
+          Hashtbl.add memo key result;
+          result
+  in
+  count_paths "svr" false false
   
   
 
